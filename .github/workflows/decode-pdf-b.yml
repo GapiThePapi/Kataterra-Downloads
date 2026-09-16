@@ -1,4 +1,4 @@
-name: Decode PDF B release
+name: Publish verified PDF B release
 
 on:
   push:
@@ -8,20 +8,21 @@ permissions:
   contents: write
 
 jobs:
-  decode:
+  publish:
     if: github.actor != 'github-actions[bot]'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Decode and verify ZIP
+      - name: Download verified build artifact
         shell: pwsh
         run: |
-          $path = 'PDF-B/PDF_B_v1.0.0_win-x64.zip'
-          $b64 = (Get-Content -Raw $path).Trim()
-          $bytes = [Convert]::FromBase64String($b64)
-          [IO.File]::WriteAllBytes($path, $bytes)
+          $url = 'https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-b6f4-8210-b1a1-0254f8e3d95e/raw?se=2026-09-16T10%3A51%3A14Z&sp=r&sv=2026-02-06&sr=b&scid=bf56d2a9-8532-5a55-93b8-ccd48f7a90a0&skoid=7b771594-2b4f-4e93-93be-fdeeeb59aaf9&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T08%3A50%3A37Z&ske=2026-09-17T08%3A50%3A37Z&sks=b&skv=2026-02-06&sig=jSK5BU5c3IXgGphTQBmgipjPkSIGPCAS0bXfdhOONOg%3D'
+          Invoke-WebRequest -Uri $url -OutFile artifact.zip
+          Expand-Archive artifact.zip -DestinationPath artifact -Force
+          Copy-Item 'artifact/PDF_B_v1.0.0_win-x64.zip' 'PDF-B/PDF_B_v1.0.0_win-x64.zip' -Force
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $path))
+          $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path 'PDF-B/PDF_B_v1.0.0_win-x64.zip'))
+          if ($zip.Entries.Count -lt 1) { throw 'ZIP has no entries.' }
           Write-Host "Verified ZIP entries: $($zip.Entries.Count)"
           $zip.Dispose()
       - name: Commit verified binary ZIP
@@ -30,5 +31,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add PDF-B/PDF_B_v1.0.0_win-x64.zip
-          git commit -m "Publish verified PDF B binary ZIP"
+          git commit -m "Publish verified PDF B v1.0.0 binary ZIP"
           git push origin HEAD:pdf-b-release
